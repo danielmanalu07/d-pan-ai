@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Sembunyikan toolbar Next.js dev indicator di sudut kiri bawah
+  devIndicators: false,
 };
 
 export default nextConfig;
