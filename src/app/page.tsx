@@ -18,13 +18,11 @@ import {
   AttachedFile
 } from '@/utils/db';
 
-const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+const DEFAULT_MODEL = 'openrouter/free';
 const DEFAULT_MODELS_FALLBACK = [
-  { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini' },
+  { id: 'openrouter/free', name: 'Free Models Router' },
+  { id: 'nex-agi/nex-n2-pro:free', name: 'Nex AGI: Nex-N2-Pro (free)' },
   { id: 'meta-llama/llama-3-8b-instruct:free', name: 'Llama 3 8B Instruct (Free)' },
-  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3' },
-  { id: 'google/gemini-flash-1.5', name: 'Google: Gemini Flash 1.5' },
-  { id: 'anthropic/claude-3-haiku', name: 'Anthropic: Claude 3 Haiku' },
 ];
 
 export default function Home() {
@@ -53,16 +51,22 @@ export default function Home() {
               id: m.id,
               name: m.name || m.id,
             }))
-            // Sort models to put standard / popular models at the top
+            // Filter to only include FREE models
+            .filter((m: any) => m.id.endsWith(':free') || m.id === 'openrouter/free')
+            // Sort models to put popular allowed ones at the top
             .sort((a: any, b: any) => {
-              const popular = ['openai/gpt-4o-mini', 'deepseek/deepseek-chat', 'meta-llama/llama-3-8b-instruct:free', 'google/gemini-flash-1.5', 'anthropic/claude-3-haiku'];
-              const aIndex = popular.indexOf(a.id);
-              const bIndex = popular.indexOf(b.id);
-              if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-              if (aIndex !== -1) return -1;
-              if (bIndex !== -1) return 1;
+              if (a.id === 'openrouter/free') return -1;
+              if (b.id === 'openrouter/free') return 1;
+              if (a.id === 'nex-agi/nex-n2-pro:free') return -1;
+              if (b.id === 'nex-agi/nex-n2-pro:free') return 1;
               return a.name.localeCompare(b.name);
             });
+
+          // Ensure 'openrouter/free' is prepended if not returned by API
+          const hasFreeRouter = formatted.some((m: any) => m.id === 'openrouter/free');
+          if (!hasFreeRouter) {
+            formatted.unshift({ id: 'openrouter/free', name: 'Free Models Router' });
+          }
 
           setModels(formatted);
         }
@@ -85,16 +89,21 @@ export default function Home() {
         if (typeof window !== 'undefined') {
           const storedModel = localStorage.getItem('d_pan_ai_default_model');
           if (storedModel) {
-            setSelectedModel(storedModel);
+            const isModelAllowed = storedModel === 'openrouter/free' || storedModel === 'nex-agi/nex-n2-pro:free';
+            setSelectedModel(isModelAllowed ? storedModel : 'openrouter/free');
           }
         }
 
         if (list.length > 0) {
           setActiveSessionId(list[0].id);
-          setSelectedModel(list[0].model);
+          const currentModel = list[0].model;
+          const isModelAllowed = currentModel === 'openrouter/free' || currentModel === 'nex-agi/nex-n2-pro:free';
+          setSelectedModel(isModelAllowed ? currentModel : 'openrouter/free');
         } else {
           // Create initial empty session
-          const initialModel = typeof window !== 'undefined' ? localStorage.getItem('d_pan_ai_default_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+          const storedModel = typeof window !== 'undefined' ? localStorage.getItem('d_pan_ai_default_model') : null;
+          const isModelAllowed = storedModel === 'openrouter/free' || storedModel === 'nex-agi/nex-n2-pro:free';
+          const initialModel = isModelAllowed ? storedModel! : DEFAULT_MODEL;
           const newSession = await createSession(initialModel, 'New Chat');
           setSessions([newSession]);
           setActiveSessionId(newSession.id);
@@ -122,7 +131,9 @@ export default function Home() {
         // Sync model selection with active session's model
         const currentSession = sessions.find(s => s.id === activeSessionId);
         if (currentSession) {
-          setSelectedModel(currentSession.model);
+          const currentModel = currentSession.model;
+          const isModelAllowed = currentModel === 'openrouter/free' || currentModel === 'nex-agi/nex-n2-pro:free';
+          setSelectedModel(isModelAllowed ? currentModel : 'openrouter/free');
         }
       } catch (err) {
         console.error('Error loading messages:', err);
@@ -342,7 +353,16 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+        let errorDetail = response.statusText;
+        try {
+          const errorJson = await response.json();
+          if (errorJson && errorJson.error) {
+            errorDetail = errorJson.error;
+          }
+        } catch (_) {
+          // Response body might not be JSON or reader failed
+        }
+        throw new Error(errorDetail);
       }
 
       // 6. Handle streaming SSE chunks

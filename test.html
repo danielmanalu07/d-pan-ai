@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Foodly UI - Bootstrap</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #151515;
+            --card: #f7f7f9;
+            --white: #ffffff;
+            --text: #111111;
+            --muted: #7a7a7a;
+            --red: #e81d2d;
+            --border: #e9e9ee;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: var(--text);
+        }
+
+        .app-shell {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--card);
+            border-radius: 30px;
+            padding: 24px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .logo {
+            font-size: 1.15rem;
+            font-weight: 900;
+            color: var(--red);
+            letter-spacing: -0.5px;
+            text-decoration: none;
+        }
+
+        .nav-pills .nav-link {
+            color: #444;
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .nav-pills .nav-link.active {
+            background: rgba(232, 29, 45, 0.08);
+            color: var(--red);
+        }
+
+        .nav-pills .nav-link i {
+            margin-right: 6px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-box {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 9px 14px;
+            background: var(--white);
+            min-width: 42px;
+        }
+
+        .cart-btn {
+            background: var(--red);
+            color: var(--white);
+            border-radius: 999px;
+            padding: 10px 16px;
+            border: 0;
+            font-weight: 700;
+        }
+
+        .cart-btn i {
+            margin-right: 6px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 18px;
+        }
+
+        .left-panel,
+        .order-panel {
+            background: var(--white);
+            border-radius: 24px;
+            padding: 20px;
+            min-width: 0;
+        }
+
+        .section-title {
+            font-weight: 800;
+            font-size: 1rem;
+            margin-bottom: 14px;
+        }
+
+        .category-row {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 24px;
+        }
+
+        .category-pill {
+            white-space: nowrap;
+            border: 0;
+            background: #f0f0f3;
+            color: #333;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-weight: 600;
+        }
+
+        .category-pill.active {
+            background: #111;
+            color: #fff;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+            align-items: center;
+            margin-top: 22px;
+        }
+
+        .food-img-wrap {
+            position: relative;
+        }
+
+        .food-img {
+            width: 100%;
+            border-radius: 32px;
+            object-fit: cover;
+            aspect-ratio: 1 / 1;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .food-img-wrap::after {
+            content: "";
+            position: absolute;
+            inset: 18px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 28px;
+            pointer-events: none;
+        }
+
+        .product-title {
+            font-size: 2.35rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
+        }
+
+        .product-desc {
+            color: var(--muted);
+            line-height: 1.6;
+            max-width: 420px;
+        }
+
+        .label {
+            font-size: 0.75rem;
+            color: #888;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-top: 26px;
+            margin-bottom: 10px;
+        }
+
+        .size-pills {
+            display: flex;
+            gap: 8px;
+        }
+
+        .size-pill {
+            border: 1px solid var(--border);
+            background: var(--white);
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .size-pill.active {
+            background: #111;
+            color: var(--white);
+            border-color: #111;
+        }
+
+        .build-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 78px);
+            gap: 12px;
+        }
+
+        .build-card {
+            border: 1px dashed #d8d8df;
+            background: #fbfbfd;
+            border-radius: 18px;
+            padding: 10px;
+            text-align: center;
+            position: relative;
+        }
+
+        .build-card img {
+            width: 54px;
+            height: 54px;
+            border-radius: 14px;
+            object-fit: cover;
+        }
+
+        .check {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #111;
+            color: #fff;
+            display: grid;
+            place-items: center;
+            font-size: 0.7rem;
+        }
+
+        .qty-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .qty {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--white);
+            font-weight: 700;
+        }
+
+        .qty-value {
+            font-weight: 800;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .add-btn {
+            border: 0;
+            border-radius: 16px;
+            background: #111;
+            color: var(--white);
+            padding: 12px 24px;
+            font-weight: 700;
+        }
+
+        .pairings {
+            margin-top: 32px;
+        }
+
+        .pairings-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .pairing-card {
+            border: 1px dashed #dedee5;
+            border-radius: 22px;
+            padding: 14px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: var(--white);
+        }
+
+        .pairing-card img {
+            width: 74px;
+            height: 74px;
+            border-radius: 18px;
+            object-fit: cover;
+        }
+
+        .pairing-card h6 {
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+
+        .pairing-card p {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .price {
+            color: var(--red);
+            font-weight: 800;
+            font-size: 0.9rem;
+        }
+
+        .plus {
+            margin-left: auto;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #111;
+            color: var(--white);
+            border: 0;
+        }
+
+        .order-panel {
+            position: sticky;
+            top: 20px;
+        }
+
+        .order-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .order-head h2 {
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .positions {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .order-item {
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .order-item img {
+            width: 66px;
+            height: 66px;
+            border-radius: 18px;
+            object-fit: cover;
+        }
+
+        .order-item h5 {
+            font-size: 0.95rem;
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+
+        .order-item p {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-bottom: 3px;
+        }
+
+        .qty-mini {
+            margin-left: auto;
+        }
+
+        .qty-mini .qty {
+            width: 28px;
+            height: 28px;
+            font-size: 0.8rem;
+        }
+
+        .qty-mini .qty-value {
+            font-size: 0.85rem;
+            min-width: 18px;
+        }
+
+        .promo {
+            border: 1px dashed #d8d8df;
+            border-radius: 18px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            background: #fbfbfd;
+        }
+
+        .promo code {
+            background: transparent;
+            color: #111;
+            font-weight: 700;
+        }
+
+        .totals {
+            margin-top: 16px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .total-row strong {
+            color: #111;
+        }
+
+        .total-row.total {
+            border-top: 1px dashed #ddd;
+            padding-top: 12px;
+            margin-top: 12px;
+            font-weight: 800;
+            font-size: 1.05rem;
+        }
+
+        .confirm {
+            width: 100%;
+            border-radius: 18px;
+            border: 0;
+            background: var(--red);
+            color: var(--white);
+            padding: 14px;
+            font-weight: 800;
+            margin-top: 16px;
+        }
+
+        @media (max-width: 991.98px) {
+            body {
+                padding: 12px;
+            }
+
+            .app-shell {
+                padding: 16px;
+            }
+
+            .topbar {
+                flex-wrap: wrap;
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .order-panel {
+                position: static;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .food-img {
+                max-width: 420px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .nav-pills {
+                width: 100%;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+            }
+
+            .nav-pills .nav-link {
+                white-space: nowrap;
+            }
+
+            .header-actions {
+                width: 100%;
+            }
+
+            .search-box {
+                flex: 1;
+            }
+
+            .product-title {
+                font-size: 2rem;
+            }
+
+            .build-grid,
+            .pairings-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .order-item {
+                align-items: flex-start;
+            }
+
+            .qty-mini {
+                margin-left: 0;
+            }
+
+            .pairing-card .plus {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-shell">
+
+        <!-- Header -->
+        <header class="topbar">
+            <div class="d-flex align-items-center gap-4 flex-wrap">
+                <a href="#" class="logo">FOODLY</a>
+
+                <nav class="nav nav-pills">
+                    <a class="nav-link active" href="#">
+                        <i class="bi bi-bowl-food"></i>Main Dishes
+                    </a>
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-flower1"></i>Vegan
+                    </a>
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-diamond"></i>Street Food
+                    </a>
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-cake2"></i>Desserts
+                    </a>
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-cup-straw"></i>Drinks
+                    </a>
+                </nav>
+            </div>
+
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="bi bi-search"></i>
+                </div>
+                <button class="cart-btn">
+                    <i class="bi bi-bag"></i>Cart
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-grid">
+
+            <!-- Left Panel -->
+            <section class="left-panel">
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="section-title mb-0">Meal Category</h3>
+                    <i class="bi bi-funnel text-muted"></i>
+                </div>
+
+                <div class="category-row">
+                    <button class="category-pill active">Pasta</button>
+                    <button class="category-pill">Salad</button>
+                    <button class="category-pill">Seafood</button>
+                    <button class="category-pill">Soups</button>
+                    <button class="category-pill">Roasted Meats</button>
+                    <button class="category-pill">Oven-Baked</button>
+                    <button class="category-pill">Plant-Based</button>
+                    <button class="category-pill">Rice</button>
+                </div>
+
+                <div class="hero">
+                    <div class="food-img-wrap">
+                        <img src="https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=900&q=80"
+                            alt="Rotini Delight" class="food-img">
+                    </div>
+
+                    <div>
+                        <h1 class="product-title">Rotini Delight</h1>
+                        <p class="product-desc">
+                            A vibrant and flavorful pasta dish made with rotini, sun-dried tomatoes,
+                            and a rich tomato-based sauce.
+                        </p>
+
+                        <div class="label">Size</div>
+                        <div class="size-pills">
+                            <button class="size-pill active">380g</button>
+                            <button class="size-pill">480g</button>
+                            <button class="size-pill">560g</button>
+                        </div>
+
+                        <div class="label">Build Your Meal</div>
+                        <div class="build-grid">
+                            <div class="build-card">
+                                <img src="https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=160&q=80"
+                                    alt="Cheese">
+                                <span class="check">✓</span>
+                            </div>
+
+                            <div class="build-card">
+                                <img src="https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=160&q=80"
+                                    alt="Tomato">
+                                <span class="check">✓</span>
+                            </div>
+
+                            <div class="build-card">
+                                <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=160&q=80"
+                                    alt="Herbs">
+                                <span class="check">✓</span>
+                            </div>
+                        </div>
+
+                        <div class="qty-row">
+                            <button class="qty">−</button>
+                            <span class="qty-value">1</span>
+                            <button class="qty">+</button>
+
+                            <button class="add-btn">
+                                <span class="me-4">$4.50</span>
+                                Add to order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommended Pairings -->
+                <div class="pairings">
+                    <h3 class="section-title">Recommended Pairings</h3>
+
+                    <div class="pairings-grid">
+                        <div class="pairing-card">
+                            <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80"
+                                alt="Caprese Salad">
+                            <div>
+                                <h6>Caprese Salad</h6>
+                                <p>380g</p>
+                                <div class="price">$3.50</div>
+                            </div>
+                            <button class="plus">+</button>
+                        </div>
+
+                        <div class="pairing-card">
+                            <img src="https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=300&q=80"
+                                alt="Tomato Sauce">
+                            <div>
+                                <h6>Tomato Sauce</h6>
+                                <p>150g</p>
+                                <div class="price">$0.75</div>
+                            </div>
+                            <button class="plus">+</button>
+                        </div>
+
+                        <div class="pairing-card">
+                            <img src="https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80"
+                                alt="Iced Lemonade">
+                            <div>
+                                <h6>Iced Lemonade</h6>
+                                <p>0.200L</p>
+                                <div class="price">$1.50</div>
+                            </div>
+                            <button class="plus">+</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Right Order Panel -->
+            <aside class="order-panel">
+                <div class="order-head">
+                    <h2 class="mb-0">My Order</h2>
+                    <span class="positions">3 positions</span>
+                </div>
+
+                <div class="order-item">
+                    <img src="https://images.unsplash.com/photo-1633945274405-b6c8069047b0?auto=format&fit=crop&w=300&q=80"
+                        alt="Chicken Biryani">
+                    <div>
+                        <h5>Chicken Biryani</h5>
+                        <p>380g</p>
+                        <div class="price">$4.50</div>
+                    </div>
+
+                    <div class="qty-mini d-flex align-items-center gap-1">
+                        <button class="qty">−</button>
+                        <span class="qty-value">1</span>
+                        <button class="qty">+</button>
+                    </div>
+                </div>
+
+                <div class="order-item">
+                    <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80"
+                        alt="Crust Supreme">
+                    <div>
+                        <h5>Crust Supreme</h5>
+                        <p>460g</p>
+                        <div class="price">$5.50</div>
+                    </div>
+
+                    <div class="qty-mini d-flex align-items-center gap-1">
+                        <button class="qty">−</button>
+                        <span class="qty-value">1</span>
+                        <button class="qty">+</button>
+                    </div>
+                </div>
+
+                <div class="order-item">
+                    <img src="https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80"
+                        alt="Gleam Breeze">
+                    <div>
+                        <h5>Gleam Breeze</h5>
+                        <p>0.350L</p>
+                        <div class="price">$2.16</div>
+                    </div>
+
+                    <div class="qty-mini d-flex align-items-center gap-1">
+                        <button class="qty">−</button>
+                        <span class="qty-value">1</span>
+                        <button class="qty">+</button>
+                    </div>
+                </div>
+
+                <div class="promo">
+                    <span>PROMOCODE</span>
+                    <code>bato <i class="bi bi-x-lg small"></i></code>
+                </div>
+
+                <div class="totals">
+                    <div class="total-row">
+                        <span>DISCOUNT</span>
+                        <span class="text-danger">-10%</span>
+                    </div>
+
+                    <div class="total-row">
+                        <span>DELIVERY</span>
+                        <strong>FREE</strong>
+                    </div>
+
+                    <div class="total-row total">
+                        <span>TOTAL</span>
+                        <strong>$12.15</strong>
+                    </div>
+                </div>
+
+                <button class="confirm">Confirm Order</button>
+            </aside>
+
+        </main>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>

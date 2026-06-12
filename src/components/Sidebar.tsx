@@ -41,7 +41,8 @@ export default function Sidebar({
     m.id.toLowerCase().includes(modelSearch.toLowerCase())
   );
 
-  const activeModelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
+  const activeModelName = models.find(m => m.id === selectedModel)?.name || 
+    (selectedModel === 'openrouter/free' ? 'Free Models Router' : selectedModel);
 
   const handleSelectModel = (modelId: string) => {
     onSelectModel(modelId);
@@ -122,18 +123,32 @@ export default function Sidebar({
                 </div>
                 <ul className="max-h-60 overflow-y-auto divide-y divide-gray-800/40">
                   {filteredModels.length > 0 ? (
-                    filteredModels.map((model) => (
-                      <li key={model.id}>
-                        <button
-                          onClick={() => handleSelectModel(model.id)}
-                          className={`w-full px-3 py-2 text-left text-xs hover:bg-indigo-600/20 hover:text-indigo-200 transition duration-150 flex flex-col gap-0.5 ${model.id === selectedModel ? 'bg-indigo-600/10 text-indigo-400 font-semibold' : 'text-gray-400'
+                    filteredModels.map((model) => {
+                      const isDisabled = model.id !== 'openrouter/free' && model.id !== 'nex-agi/nex-n2-pro:free';
+                      return (
+                        <li key={model.id}>
+                          <button
+                            onClick={() => !isDisabled && handleSelectModel(model.id)}
+                            disabled={isDisabled}
+                            className={`w-full px-3 py-2 text-left text-xs transition duration-150 flex flex-col gap-0.5 ${
+                              model.id === selectedModel 
+                                ? 'bg-indigo-600/10 text-indigo-400 font-semibold' 
+                                : isDisabled 
+                                  ? 'opacity-35 cursor-not-allowed text-gray-650' 
+                                  : 'text-gray-400 hover:bg-indigo-600/20 hover:text-indigo-200'
                             }`}
-                        >
-                          <span className="truncate font-medium">{model.name}</span>
-                          <span className="text-[10px] text-gray-600 truncate">{model.id}</span>
-                        </button>
-                      </li>
-                    ))
+                          >
+                            <div className="flex items-center gap-1.5 justify-between w-full">
+                              <span className="truncate font-medium">{model.name}</span>
+                              {isDisabled && (
+                                <span className="text-[8px] bg-gray-950 px-1 py-0.5 rounded text-gray-500 font-sans border border-border-color/25 uppercase font-semibold">Disabled</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-gray-600 truncate">{model.id}</span>
+                          </button>
+                        </li>
+                      );
+                    })
                   ) : (
                     <li className="px-3 py-4 text-center text-xs text-gray-500">
                       No models found

@@ -591,7 +591,7 @@ export default function ChatWindow({
     }
   }, [input]);
 
-  const handleFileChange = async (files: FileList | null) => {
+  const handleFileChange = async (files: FileList | File[] | null) => {
     if (!files) return;
     const fileList = Array.from(files);
 
@@ -795,6 +795,27 @@ export default function ChatWindow({
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       handleFileChange(files);
+    }
+  };
+
+  // Clipboard paste handler
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    const pastedFiles: File[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) {
+          pastedFiles.push(file);
+        }
+      }
+    }
+
+    if (pastedFiles.length > 0) {
+      e.preventDefault();
+      handleFileChange(pastedFiles);
     }
   };
 
@@ -1019,10 +1040,11 @@ export default function ChatWindow({
                       {/* Content text (or markdown for assistant) */}
                       {isAssistant ? (
                         isPending ? (
-                          <div className="flex items-center gap-1 py-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-450 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-450 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-450 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          <div className="flex items-center gap-2 py-1 px-0.5">
+                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                            <span className="text-xs text-indigo-300/80 font-medium font-sans ml-1.5 animate-pulse tracking-wide">D-Pan-AI sedang memproses...</span>
                           </div>
                         ) : (
                           <div className="prose prose-invert max-w-none text-gray-200 prose-headings:text-indigo-300 prose-a:text-indigo-400 prose-strong:text-white prose-code:text-indigo-300">
@@ -1042,7 +1064,7 @@ export default function ChatWindow({
                                 }
                               }}
                             >
-                              {msg.content}
+                              {isGenerating && isLast ? `${msg.content} ▋` : msg.content}
                             </ReactMarkdown>
                             {msg.audioUrl && (
                               <div className="mt-3.5 border-t border-indigo-500/10 pt-3">
@@ -1277,6 +1299,7 @@ export default function ChatWindow({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Tulis pesan ke D-Pan-AI... (Tekan Shift+Enter untuk baris baru)"
               className="flex-1 bg-transparent border-0 text-sm text-gray-200 placeholder-gray-500 focus:ring-0 focus:outline-none py-2 resize-none max-h-[180px] min-h-[36px]"
             />
