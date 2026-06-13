@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "D-Pan-AI Chat",
-  description: "Chatbot by D-Pan",
+  description: "Personal AI assistant By Daniel Manalu (free)",
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",
