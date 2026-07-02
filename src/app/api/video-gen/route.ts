@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'OpenRouter API key is not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'Rinel Router API key is not configured' }, { status: 500 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -17,22 +17,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const openRouterResponse = await fetch(`https://openrouter.ai/api/v1/videos/${jobId}`, {
+    const response = await fetch(`https://rinel-router.duckdns.org/v1/videos/${jobId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
       },
     });
 
-    if (!openRouterResponse.ok) {
-      const errorText = await openRouterResponse.text();
+    if (!response.ok) {
+      const errorText = await response.text();
       return NextResponse.json(
-        { error: `OpenRouter Video Gen status returned error: ${errorText}` },
-        { status: openRouterResponse.status }
+        { error: `Rinel Router Video Gen status returned error: ${errorText}` },
+        { status: response.status }
       );
     }
 
-    const result = await openRouterResponse.json();
+    const result = await response.json();
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error in video-gen GET handler:', error);
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'OpenRouter API key is not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'Rinel Router API key is not configured' }, { status: 500 });
   }
 
   try {
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       payload.aspect_ratio = aspect_ratio;
     }
 
-    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/videos', {
+    const response = await fetch('https://rinel-router.duckdns.org/v1/videos', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -75,15 +75,15 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     });
 
-    if (!openRouterResponse.ok) {
-      const errorText = await openRouterResponse.text();
+    if (!response.ok) {
+      const errorText = await response.text();
       return NextResponse.json(
-        { error: `OpenRouter Video Gen API returned error: ${errorText}` },
-        { status: openRouterResponse.status }
+        { error: `Rinel Router Video Gen API returned error: ${errorText}` },
+        { status: response.status }
       );
     }
 
-    const result = await openRouterResponse.json();
+    const result = await response.json();
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error in video-gen POST handler:', error);

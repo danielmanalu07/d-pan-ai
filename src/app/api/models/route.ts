@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
+    const response = await fetch('https://rinel-router.duckdns.org/v1/models', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -20,7 +20,7 @@ export async function GET() {
     if (!response.ok) {
       const errorText = await response.text();
       return NextResponse.json(
-        { error: `Failed to fetch models from OpenRouter: ${errorText}` },
+        { error: `Failed to fetch models from Rinel Router: ${errorText}` },
         { status: response.status }
       );
     }

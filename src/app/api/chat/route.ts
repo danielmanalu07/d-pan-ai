@@ -16,28 +16,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing model or messages' }, { status: 400 });
     }
 
-    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const routerResponse = await fetch('https://rinel-router.duckdns.org/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': req.nextUrl.origin || 'http://localhost:3000',
-        'X-Title': 'D-Pan-AI',
       },
       body: JSON.stringify({
         model,
         messages,
         stream: stream ?? false,
-        ...(modalities ? { modalities } : {}),
-        ...(audio ? { audio } : {}),
       }),
     });
 
-    if (!openRouterResponse.ok) {
-      const errorText = await openRouterResponse.text();
+    if (!routerResponse.ok) {
+      const errorText = await routerResponse.text();
       return NextResponse.json(
-        { error: `OpenRouter API returned error: ${errorText}` },
-        { status: openRouterResponse.status }
+        { error: `Rinel Router API returned error: ${errorText}` },
+        { status: routerResponse.status }
       );
     }
 
@@ -45,11 +41,11 @@ export async function POST(req: NextRequest) {
     if (stream) {
       const customStream = new ReadableStream({
         async start(controller) {
-          if (!openRouterResponse.body) {
+          if (!routerResponse.body) {
             controller.close();
             return;
           }
-          const reader = openRouterResponse.body.getReader();
+          const reader = routerResponse.body.getReader();
           try {
             while (true) {
               const { done, value } = await reader.read();
@@ -74,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Handle non-streaming
-    const data = await openRouterResponse.json();
+    const data = await routerResponse.json();
     return NextResponse.json(data);
   } catch (error: any) {
     console.error('Error in chat route handler:', error);

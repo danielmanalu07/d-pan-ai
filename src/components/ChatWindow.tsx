@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Send, Plus, Image, X, Menu, Bot, User, Copy, Check, Sparkles, UploadCloud, CornerDownLeft,
-  FileText, FileSpreadsheet, FileCode, File, Download, Volume2, Video, Mic, Music, Play, Pause, Headphones
+  FileText, FileSpreadsheet, FileCode, File, Download, Video, Music, Volume2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -34,124 +34,9 @@ function loadScript(url: string, globalName: string): Promise<any> {
   });
 }
 
-// Local TTSButton component for reading AI content aloud using OpenRouter TTS API
-function TTSButton({ text }: { text: string }) {
-  const [speaking, setSpeaking] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handleSpeak = async () => {
-    if (speaking) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      setSpeaking(false);
-      return;
-    }
 
-    // Strip markdown formatting before speaking
-    const cleanText = text
-      .replace(/\[.*?\]\(.*?\)/g, '')
-      .replace(/[*#`_\-]/g, '')
-      .trim();
 
-    if (!cleanText) return;
-
-    setSpeaking(true);
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: cleanText.slice(0, 1000) }), // limit text to prevent huge synthesis
-      });
-
-      if (!res.ok) throw new Error('TTS failed');
-      const blob = await res.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      audio.onended = () => {
-        setSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-
-      audio.onerror = () => {
-        setSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.error('TTS error, falling back to browser synthesis:', err);
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = /dan|yang|untuk|adalah|saya/i.test(cleanText) ? 'id-ID' : 'en-US';
-        utterance.onend = () => setSpeaking(false);
-        utterance.onerror = () => setSpeaking(false);
-        window.speechSynthesis.speak(utterance);
-      } else {
-        setSpeaking(false);
-      }
-    }
-  };
-
-  return (
-    <button
-      onClick={handleSpeak}
-      className={`p-1 flex items-center justify-center rounded-lg border border-border-color/40 transition ${speaking
-        ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
-        : 'bg-gray-950/40 text-gray-500 hover:text-gray-350 hover:bg-gray-800/60'
-        }`}
-      title={speaking ? "Stop Membaca" : "Baca Bersuara (TTS)"}
-    >
-      <Volume2 size={12} className={speaking ? "animate-pulse" : ""} />
-    </button>
-  );
-}
-
-// Inline MessageAudioPlayer for assistant voice responses
-function MessageAudioPlayer({ audioUrl }: { audioUrl: string }) {
-  const [playing, setPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    // Check if audioUrl is base64 or valid data url
-    const src = audioUrl.startsWith('data:') ? audioUrl : `data:audio/wav;base64,${audioUrl}`;
-    audioRef.current = new Audio(src);
-    audioRef.current.onended = () => setPlaying(false);
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
-  }, [audioUrl]);
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
-    } else {
-      audioRef.current.play().catch(err => console.error("Audio playback error:", err));
-      setPlaying(true);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2.5 p-2 bg-indigo-950/45 border border-indigo-550/20 rounded-xl max-w-max shadow-inner">
-      <button
-        type="button"
-        onClick={togglePlay}
-        className="p-1.5 bg-indigo-650 hover:bg-indigo-550 text-white rounded-lg transition active:scale-95 flex items-center justify-center"
-      >
-        {playing ? <Pause size={12} className="text-white" /> : <Play size={12} className="text-white" />}
-      </button>
-      <span className="text-[10px] text-indigo-300 font-semibold font-sans tracking-wide pr-1">
-        {playing ? 'Memutar Suara...' : 'Putar Respon Suara AI'}
-      </span>
-    </div>
-  );
-}
 
 // Copyable CodeBlock Component
 function CodeBlock({ language, value }: { language: string; value: string }) {
@@ -286,7 +171,7 @@ export default function ChatWindow({
   const [isShowImageGenModal, setIsShowImageGenModal] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageGenPrompt, setImageGenPrompt] = useState('');
-  const [imageGenModel, setImageGenModel] = useState('black-forest-labs/flux-schnell');
+  const [imageGenModel, setImageGenModel] = useState('gemini/gemini-2.5-flash-image');
   const [imageGenResult, setImageGenResult] = useState('');
   const [imageGenError, setImageGenError] = useState('');
   const [imageGenRatio, setImageGenRatio] = useState('1:1');
@@ -335,135 +220,7 @@ export default function ChatWindow({
     };
   }, [showAttachmentMenu]);
 
-  // Speech-to-Text: Native microphone recording + OpenRouter Whisper API
-  // Falls back to browser Web Speech API if microphone/API fails
-  const startRecordingAudio = async () => {
-    // Check if MediaRecorder/getUserMedia is available at all
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      // Fallback: use browser Web Speech API
-      startWebSpeechFallback();
-      return;
-    }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        // Stop audio tracks
-        stream.getTracks().forEach(track => track.stop());
-
-        setIsTranscribing(true);
-        try {
-          const base64data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => {
-              const result = reader.result as string;
-              const b64 = result.split(',')[1];
-              if (b64) resolve(b64);
-              else reject(new Error('Failed to read audio blob'));
-            };
-            reader.onerror = () => reject(reader.error);
-          });
-
-          const res = await fetch('/api/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              data: base64data,
-              format: 'webm',
-            }),
-          });
-
-          if (!res.ok) {
-            const errJson = await res.json().catch(() => ({ error: res.statusText }));
-            throw new Error(errJson.error || `HTTP ${res.status}`);
-          }
-          const respData = await res.json();
-          const text = respData.text || '';
-          if (text.trim()) {
-            setInput(prev => prev + (prev ? ' ' : '') + text.trim());
-          } else {
-            console.warn('[transcribe] Empty transcript returned');
-          }
-        } catch (err: any) {
-          console.error('Transcription error:', err);
-          // Show non-blocking toast instead of crash
-          const msg = err?.message || '';
-          if (msg.includes('402') || msg.toLowerCase().includes('payment')) {
-            alert('Transkripsi gagal: kredit OpenRouter tidak cukup untuk model Whisper. Fitur ini memerlukan kredit berbayar.');
-          } else {
-            alert(`Transkripsi gagal: ${msg || 'Terjadi kesalahan tidak terduga.'}`);
-          }
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      mediaRecorder.start();
-      setAudioRecording(true);
-    } catch (err: any) {
-      console.error('Error starting audio recording:', err);
-
-      const name = err?.name || '';
-      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        // User dismissed or denied the permission dialog — fallback to Web Speech API
-        console.info('[STT] Microphone permission denied/dismissed — trying Web Speech API fallback');
-        startWebSpeechFallback();
-      } else if (name === 'NotFoundError') {
-        alert('Tidak ada mikrofon yang terdeteksi di perangkat ini.');
-      } else {
-        alert(`Gagal mengakses mikrofon: ${err?.message || 'Kesalahan tidak diketahui'}`);
-      }
-    }
-  };
-
-  const stopRecordingAudio = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      setAudioRecording(false);
-    }
-  };
-
-  // Web Speech API fallback (browser-native, no API cost, works offline)
-  const startWebSpeechFallback = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Speech-to-Text tidak tersedia di browser Anda. Gunakan Chrome atau Edge, dan izinkan akses mikrofon.');
-      return;
-    }
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'id-ID';
-
-    recognition.onstart = () => setAudioRecording(true);
-    recognition.onend = () => setAudioRecording(false);
-    recognition.onerror = (e: any) => {
-      console.error('Web Speech error:', e.error);
-      setAudioRecording(false);
-      if (e.error !== 'no-speech' && e.error !== 'aborted') {
-        alert(`Speech Recognition error: ${e.error}`);
-      }
-    };
-    recognition.onresult = (e: any) => {
-      const transcript = e.results[0]?.[0]?.transcript || '';
-      if (transcript.trim()) {
-        setInput(prev => prev + (prev ? ' ' : '') + transcript.trim());
-      }
-    };
-    recognition.start();
-  };
 
   // Video Generation job submit & status polling
   const handleGenerateVideo = async () => {
@@ -1066,11 +823,6 @@ export default function ChatWindow({
                             >
                               {isGenerating && isLast ? `${msg.content} ▋` : msg.content}
                             </ReactMarkdown>
-                            {msg.audioUrl && (
-                              <div className="mt-3.5 border-t border-indigo-500/10 pt-3">
-                                <MessageAudioPlayer audioUrl={msg.audioUrl} />
-                              </div>
-                            )}
                           </div>
                         )
                       ) : (
@@ -1091,7 +843,6 @@ export default function ChatWindow({
                         >
                           <Copy size={12} />
                         </button>
-                        <TTSButton text={msg.content} />
                       </div>
                     )}
                   </div>
@@ -1188,13 +939,11 @@ export default function ChatWindow({
               >
                 <div className="px-2.5 py-1.5 border-b border-white/5 mb-1.5 flex items-center justify-between">
                   <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">Pilih Mode Multimodal</span>
-                </div>
-
-                <button
+                </div>                <button
                   type="button"
                   onClick={() => {
                     setShowAttachmentMenu(false);
-                    triggerUpload('image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx,.csv,.json,.md,audio/*,video/*');
+                    triggerUpload('application/pdf,text/*,.doc,.docx,.xls,.xlsx,.csv,.json,.md,.html,.txt');
                   }}
                   className="flex items-center gap-3 px-2.5 py-2 hover:bg-gray-900 text-gray-300 rounded-xl transition text-left text-xs"
                 >
@@ -1203,7 +952,7 @@ export default function ChatWindow({
                   </div>
                   <div>
                     <p className="font-semibold text-gray-200">Upload Files</p>
-                    <p className="text-[9px] text-gray-500 font-light">Gambar, PDF, Docs, Excel, Audio, Video</p>
+                    <p className="text-[9px] text-gray-500 font-light">PDF, TXT, DOCX, XLSX, HTML, dll.</p>
                   </div>
                 </button>
 
@@ -1219,7 +968,7 @@ export default function ChatWindow({
                     <Sparkles size={14} />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-250">AI Image Generator</p>
+                    <p className="font-semibold text-gray-255">AI Image Generator</p>
                     <p className="text-[9px] text-gray-500 font-light">Buat gambar AI dengan teks</p>
                   </div>
                 </button>
@@ -1236,31 +985,8 @@ export default function ChatWindow({
                     <Video size={14} />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-250">AI Video Generator</p>
+                    <p className="font-semibold text-gray-255">AI Video Generator</p>
                     <p className="text-[9px] text-gray-500 font-light">Buat video AI asinkron dengan teks</p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAttachmentMenu(false);
-                    if (audioRecording) {
-                      stopRecordingAudio();
-                    } else {
-                      startRecordingAudio();
-                    }
-                  }}
-                  className={`flex items-center gap-3 px-2.5 py-2 hover:bg-gray-900 text-gray-350 rounded-xl transition text-left text-xs ${audioRecording ? 'bg-red-500/10 border border-red-500/20 text-red-200' : ''
-                    }`}
-                >
-                  <div className={`p-1.5 rounded-lg ${audioRecording ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-rose-500/10 text-rose-405'
-                    }`}>
-                    <Mic size={14} />
-                  </div>
-                  <div>
-                    <p className="font-semibold">{audioRecording ? "Stop Recording" : "Speech-to-Text"}</p>
-                    <p className="text-[9px] text-gray-500 font-light">Ketik menggunakan rekaman suara</p>
                   </div>
                 </button>
               </div>
@@ -1304,18 +1030,7 @@ export default function ChatWindow({
               className="flex-1 bg-transparent border-0 text-sm text-gray-200 placeholder-gray-500 focus:ring-0 focus:outline-none py-2 resize-none max-h-[180px] min-h-[36px]"
             />
 
-            {/* Voice Response Toggle */}
-            <button
-              type="button"
-              onClick={() => setVoiceResponseEnabled(!voiceResponseEnabled)}
-              className={`p-2.5 rounded-xl transition shrink-0 border ${voiceResponseEnabled
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/35 shadow-md shadow-emerald-500/5'
-                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60 border-transparent'
-                }`}
-              title={voiceResponseEnabled ? "Voice Response: Enabled (AI will talk back)" : "Voice Response: Disabled"}
-            >
-              <Headphones size={16} className={voiceResponseEnabled ? "animate-pulse" : ""} />
-            </button>
+
 
             {/* Send Button */}
             <button
@@ -1464,27 +1179,7 @@ export default function ChatWindow({
         </div>
       )}
 
-      {/* Speech-to-Text Recording Banner overlay */}
-      {audioRecording && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-red-950/90 border border-red-500/35 px-4 py-2.5 rounded-full flex items-center gap-3 glass shadow-xl z-30 animate-pulse">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
-          <span className="text-xs font-semibold text-red-200">Sedang Merekam Audio...</span>
-          <button
-            type="button"
-            onClick={stopRecordingAudio}
-            className="text-[10px] bg-red-500 text-white font-bold px-2.5 py-1 rounded-full hover:bg-red-600 transition"
-          >
-            Selesai
-          </button>
-        </div>
-      )}
 
-      {isTranscribing && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-indigo-950/90 border border-indigo-500/35 px-4 py-2.5 rounded-full flex items-center gap-3 glass shadow-xl z-30">
-          <span className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
-          <span className="text-xs font-semibold text-indigo-200">Mentranskripsi rekaman suara...</span>
-        </div>
-      )}
 
       {/* Image Generation Modal */}
       {isShowImageGenModal && (
@@ -1504,14 +1199,10 @@ export default function ChatWindow({
               <div>
                 <label className="block text-xs font-semibold text-gray-400 mb-1.5 font-sans">Model Pilihan</label>
                 <select
-                  value={imageGenModel}
-                  onChange={(e) => setImageGenModel(e.target.value)}
-                  className="w-full text-xs bg-gray-950 border border-border-color rounded-xl p-2.5 text-gray-300 focus:outline-none focus:border-indigo-500 font-sans"
+                  disabled
+                  className="w-full text-xs bg-gray-950/50 border border-border-color rounded-xl p-2.5 text-gray-400 focus:outline-none font-sans cursor-not-allowed"
                 >
-                  <option value="black-forest-labs/flux-schnell">Flux Schnell (Cepat)</option>
-                  <option value="black-forest-labs/flux-1.1-pro">Flux 1.1 Pro (Berkualitas)</option>
-                  <option value="google/gemini-3.1-flash-image-preview">Gemini Flash Image</option>
-                  <option value="microsoft/mai-image-2.5">Microsoft MAI 2.5</option>
+                  <option value="gemini/gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
                 </select>
               </div>
               <div>

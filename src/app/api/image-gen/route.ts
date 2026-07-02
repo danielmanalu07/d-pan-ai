@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     // Per OpenRouter docs: image generation uses /api/v1/chat/completions
     // with modalities: ["image"] (or ["image","text"] for models like Gemini)
     // NOT the /api/v1/images/generations endpoint
-    const selectedModel = model || 'black-forest-labs/flux-schnell';
+    const selectedModel = model || 'gemini/gemini-2.5-flash-image';
 
     const body: Record<string, unknown> = {
       model: selectedModel,
@@ -37,27 +37,25 @@ export async function POST(req: NextRequest) {
       body.image_config = { aspect_ratio };
     }
 
-    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const routerResponse = await fetch('https://rinel-router.duckdns.org/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://d-pan-ai.local',
-        'X-Title': 'D-Pan-AI',
       },
       body: JSON.stringify(body),
     });
 
-    if (!openRouterResponse.ok) {
-      const errorText = await openRouterResponse.text();
-      console.error(`[image-gen] OpenRouter error ${openRouterResponse.status}:`, errorText);
+    if (!routerResponse.ok) {
+      const errorText = await routerResponse.text();
+      console.error(`[image-gen] Rinel Router error ${routerResponse.status}:`, errorText);
       return NextResponse.json(
-        { error: `Image generation API error (${openRouterResponse.status}): ${errorText}` },
-        { status: openRouterResponse.status }
+        { error: `Image generation API error (${routerResponse.status}): ${errorText}` },
+        { status: routerResponse.status }
       );
     }
 
-    const result = await openRouterResponse.json();
+    const result = await routerResponse.json();
 
     // Extract image URL from response
     // OpenRouter returns images in choices[0].message.images[] or as content array with type=image_url

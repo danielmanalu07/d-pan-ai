@@ -17,12 +17,13 @@ import {
   ChatMessage,
   AttachedFile
 } from '@/utils/db';
+import { chunkText, fetchEmbeddings, retrieveRelevantContext, ChunkWithEmbedding } from '@/utils/rag';
 
-const DEFAULT_MODEL = 'openrouter/free';
+const DEFAULT_MODEL = 'gemini/gemini-2.5-flash';
 const DEFAULT_MODELS_FALLBACK = [
-  { id: 'openrouter/free', name: 'Free Models Router' },
-  { id: 'nex-agi/nex-n2-pro:free', name: 'Nex AGI: Nex-N2-Pro (free)' },
-  { id: 'meta-llama/llama-3-8b-instruct:free', name: 'Llama 3 8B Instruct (Free)' },
+  { id: 'gemini/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'gemini/gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
 ];
 
 export default function Home() {
@@ -36,7 +37,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // 1. Fetch available models from OpenRouter API proxy on mount
+  // 1. Fetch available models from API on mount
   useEffect(() => {
     async function fetchModels() {
       try {
@@ -45,30 +46,43 @@ export default function Home() {
         
         const data = await response.json();
         if (data.data && Array.isArray(data.data)) {
-          // Format & map to basic structure
+          // Format, filter, & map to basic structure
           const formatted = data.data
-            .map((m: any) => ({
-              id: m.id,
-              name: m.name || m.id,
-            }))
-            // Filter to only include FREE models
-            .filter((m: any) => m.id.endsWith(':free') || m.id === 'openrouter/free')
-            // Sort models to put popular allowed ones at the top
-            .sort((a: any, b: any) => {
-              if (a.id === 'openrouter/free') return -1;
-              if (b.id === 'openrouter/free') return 1;
-              if (a.id === 'nex-agi/nex-n2-pro:free') return -1;
-              if (b.id === 'nex-agi/nex-n2-pro:free') return 1;
-              return a.name.localeCompare(b.name);
-            });
-
-          // Ensure 'openrouter/free' is prepended if not returned by API
-          const hasFreeRouter = formatted.some((m: any) => m.id === 'openrouter/free');
-          if (!hasFreeRouter) {
-            formatted.unshift({ id: 'openrouter/free', name: 'Free Models Router' });
-          }
+            .filter((m: any) => {
+              const id = m.id.toLowerCase();
+              return !id.startsWith('gc/') && !id.startsWith('gc');
+            })
+            .map((m: any) => {
+              const displayName = m.name || m.id;
+              const cleanName = displayName.replace(/^gemini\//i, '');
+              return {
+                id: m.id,
+                name: cleanName,
+              };
+            })
+            // Sort models alphabetically
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
           setModels(formatted);
+
+          // Select the first valid non-disabled Gemini chat model from endpoint
+          const firstGeminiChatModel = formatted.find((m: any) => {
+            const id = m.id.toLowerCase();
+            const name = m.name.toLowerCase();
+            const isEmbedding = id.includes('embed');
+            const isImage = id.includes('image');
+            const isPro = id.includes('pro') || name.includes('pro');
+            const isGemini = id.includes('gemini') || id.includes('gemma');
+            return isGemini && !isEmbedding && !isImage && !isPro;
+          });
+
+          if (firstGeminiChatModel) {
+            setSelectedModel(prev => {
+              const hasStored = typeof window !== 'undefined' && localStorage.getItem('d_pan_ai_default_model');
+              if (hasStored) return prev;
+              return firstGeminiChatModel.id;
+            });
+          }
         }
       } catch (err) {
         console.warn('Using default models fallback. Error fetching models:', err);
@@ -89,21 +103,17 @@ export default function Home() {
         if (typeof window !== 'undefined') {
           const storedModel = localStorage.getItem('d_pan_ai_default_model');
           if (storedModel) {
-            const isModelAllowed = storedModel === 'openrouter/free' || storedModel === 'nex-agi/nex-n2-pro:free';
-            setSelectedModel(isModelAllowed ? storedModel : 'openrouter/free');
+            setSelectedModel(storedModel);
           }
         }
 
         if (list.length > 0) {
           setActiveSessionId(list[0].id);
-          const currentModel = list[0].model;
-          const isModelAllowed = currentModel === 'openrouter/free' || currentModel === 'nex-agi/nex-n2-pro:free';
-          setSelectedModel(isModelAllowed ? currentModel : 'openrouter/free');
+          setSelectedModel(list[0].model);
         } else {
           // Create initial empty session
           const storedModel = typeof window !== 'undefined' ? localStorage.getItem('d_pan_ai_default_model') : null;
-          const isModelAllowed = storedModel === 'openrouter/free' || storedModel === 'nex-agi/nex-n2-pro:free';
-          const initialModel = isModelAllowed ? storedModel! : DEFAULT_MODEL;
+          const initialModel = storedModel || DEFAULT_MODEL;
           const newSession = await createSession(initialModel, 'New Chat');
           setSessions([newSession]);
           setActiveSessionId(newSession.id);
@@ -131,9 +141,7 @@ export default function Home() {
         // Sync model selection with active session's model
         const currentSession = sessions.find(s => s.id === activeSessionId);
         if (currentSession) {
-          const currentModel = currentSession.model;
-          const isModelAllowed = currentModel === 'openrouter/free' || currentModel === 'nex-agi/nex-n2-pro:free';
-          setSelectedModel(isModelAllowed ? currentModel : 'openrouter/free');
+          setSelectedModel(currentSession.model);
         }
       } catch (err) {
         console.error('Error loading messages:', err);
@@ -239,25 +247,103 @@ export default function Home() {
         );
       }
 
-      // 3. Prepare messages for API request payload
-      // Include past messages + the new user message
-      const chatHistory = [...messages, userMsg];
-      const apiMessages = chatHistory.map(msg => {
-        // Handle new unified files format
-        if (msg.role === 'user' && msg.files && msg.files.length > 0) {
-          let textVal = msg.content;
-          const textFiles = msg.files.filter(f => !f.type.startsWith('image/') && !f.type.startsWith('audio/') && !f.type.startsWith('video/') && f.textContent);
-          
-          if (textFiles.length > 0) {
-            textVal += "\n\n---\n[Lampiran Dokumen]:";
-            textFiles.forEach(f => {
-              textVal += `\n\n=== NAMA FILE: ${f.name} ===\n${f.textContent}\n======================`;
+      // 3. RAG pipeline for handling large text-based document attachments
+      // Gather all text files in the session (past messages + new files)
+      const sessionTextFiles: AttachedFile[] = [];
+      messages.forEach(m => {
+        if (m.files) {
+          m.files.forEach(f => {
+            if (!f.type.startsWith('image/') && !f.type.startsWith('audio/') && !f.type.startsWith('video/') && f.textContent) {
+              if (!sessionTextFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
+                sessionTextFiles.push(f);
+              }
+            }
+          });
+        }
+      });
+      if (files) {
+        files.forEach(f => {
+          if (!f.type.startsWith('image/') && !f.type.startsWith('audio/') && !f.type.startsWith('video/') && f.textContent) {
+            if (!sessionTextFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
+              sessionTextFiles.push(f);
+            }
+          }
+        });
+      }
+
+      const totalTextLength = sessionTextFiles.reduce((sum, f) => sum + (f.textContent?.length || 0), 0);
+      const useRAG = totalTextLength > 6000;
+
+      let retrievedContext = '';
+      if (useRAG) {
+        console.log(`[RAG] Total session text content is ${totalTextLength} chars. Performing RAG with query: "${content}"`);
+        const allChunks: { text: string; fileName: string }[] = [];
+        sessionTextFiles.forEach(f => {
+          if (f.textContent) {
+            const chunks = chunkText(f.textContent, 1000, 200);
+            chunks.forEach(chunk => {
+              allChunks.push({
+                text: `=== FILE: ${f.name} ===\n${chunk}`,
+                fileName: f.name
+              });
             });
           }
+        });
 
-          // If there are no image/audio/video files, return content as a simple string for maximum model compatibility
-          const hasMultimodal = msg.files.some(f => f.type.startsWith('image/') || f.type.startsWith('audio/') || f.type.startsWith('video/'));
-          if (!hasMultimodal) {
+        try {
+          // Fetch embeddings in batches of 30
+          const chunkTexts = allChunks.map(c => c.text);
+          const embeddings: number[][] = [];
+          const batchSize = 30;
+          for (let i = 0; i < chunkTexts.length; i += batchSize) {
+            const batch = chunkTexts.slice(i, i + batchSize);
+            const batchEmbeddings = await fetchEmbeddings(batch);
+            embeddings.push(...batchEmbeddings);
+          }
+
+          // Map chunks to embeddings
+          const chunksWithEmbeddings: ChunkWithEmbedding[] = allChunks.map((chunk, idx) => ({
+            text: chunk.text,
+            embedding: embeddings[idx]
+          }));
+
+          // Retrieve relevant chunks matching query
+          retrievedContext = await retrieveRelevantContext(content, chunksWithEmbeddings, 5);
+        } catch (ragErr) {
+          console.error('[RAG] Failed to run RAG context selection:', ragErr);
+        }
+      }
+
+      // 4. Prepare messages for API request payload
+      const chatHistory = [...messages, userMsg];
+      const apiMessages = chatHistory.map((msg, index) => {
+        const isCurrentMessage = index === chatHistory.length - 1;
+
+        if (msg.role === 'user') {
+          let textVal = msg.content;
+
+          if (useRAG) {
+            // For RAG mode: inject the retrieved context ONLY in the current user prompt payload
+            if (isCurrentMessage && retrievedContext) {
+              textVal += `\n\n---\n[Konteks Dokumen Relevan (Hasil Pencarian RAG)]:\n${retrievedContext}`;
+            }
+          } else {
+            // For non-RAG mode: append text files of this message
+            const msgFiles = isCurrentMessage ? (files || []) : (msg.files || []);
+            const textFiles = msgFiles.filter(f => !f.type.startsWith('image/') && !f.type.startsWith('audio/') && !f.type.startsWith('video/') && f.textContent);
+            if (textFiles.length > 0) {
+              textVal += "\n\n---\n[Lampiran Dokumen]:";
+              textFiles.forEach(f => {
+                textVal += `\n\n=== NAMA FILE: ${f.name} ===\n${f.textContent}\n======================`;
+              });
+            }
+          }
+
+          // Gather image files for multimodal input
+          const msgFiles = isCurrentMessage ? (files || []) : (msg.files || []);
+          const imageFiles = msgFiles.filter(f => f.type.startsWith('image/'));
+
+          if (imageFiles.length === 0) {
             return {
               role: 'user',
               content: textVal
@@ -265,76 +351,30 @@ export default function Home() {
           }
 
           const contentItems: any[] = [{ type: 'text', text: textVal }];
-          
-          msg.files.forEach(f => {
-            if (f.type.startsWith('image/')) {
-              contentItems.push({
-                type: 'image_url',
-                image_url: { url: f.content }
-              });
-            } else if (f.type.startsWith('audio/')) {
-              let format = 'wav';
-              const mimeMatch = f.type.match(/audio\/([a-zA-Z0-9]+)/);
-              if (mimeMatch) {
-                format = mimeMatch[1];
-              }
-              const base64Data = f.content.split(';base64,')[1] || f.content;
-              contentItems.push({
-                type: 'input_audio',
-                input_audio: {
-                  data: base64Data,
-                  format: format === 'mpeg' ? 'mp3' : format
-                }
-              });
-            } else if (f.type.startsWith('video/')) {
-              contentItems.push({
-                type: 'video_url',
-                video_url: {
-                  url: f.content
-                }
-              });
-            }
+          imageFiles.forEach(f => {
+            contentItems.push({
+              type: 'image_url',
+              image_url: { url: f.content }
+            });
           });
 
           return {
             role: 'user',
             content: contentItems
           };
-        } else if (msg.role === 'user' && msg.images && msg.images.length > 0) {
-          // Legacy support for multiple images
-          return {
-            role: 'user',
-            content: [
-              { type: 'text', text: msg.content },
-              ...msg.images.map(img => ({
-                type: 'image_url',
-                image_url: { url: img }
-              }))
-            ]
-          };
-        } else if (msg.role === 'user' && msg.image) {
-          // Backward compatibility
-          return {
-            role: 'user',
-            content: [
-              { type: 'text', text: msg.content },
-              { type: 'image_url', image_url: { url: msg.image } }
-            ]
-          };
         }
+
         return {
           role: msg.role,
           content: msg.content
         };
       });
 
-      // 4. Create placeholder AI message in IndexedDB/State
+      // 5. Create placeholder AI message in IndexedDB/State
       const assistantMsg = await addMessage(sessionId, 'assistant', '');
       setMessages(prev => [...prev, assistantMsg]);
 
-      const isNativeAudioModel = selectedModel.includes('gpt-audio');
-
-      // 5. Fetch streaming chat completions
+      // 6. Fetch streaming completions from Rinel Router completions endpoint
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -342,13 +382,6 @@ export default function Home() {
           model: selectedModel,
           messages: apiMessages,
           stream: true,
-          ...(requestAudio && isNativeAudioModel ? {
-            modalities: ["text", "audio"],
-            audio: {
-              voice: "alloy",
-              format: "wav"
-            }
-          } : {})
         })
       });
 
@@ -359,18 +392,15 @@ export default function Home() {
           if (errorJson && errorJson.error) {
             errorDetail = errorJson.error;
           }
-        } catch (_) {
-          // Response body might not be JSON or reader failed
-        }
+        } catch (_) {}
         throw new Error(errorDetail);
       }
 
-      // 6. Handle streaming SSE chunks
+      // 7. Stream SSE chunks
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let streamContent = '';
       let buffer = '';
-      const audioDataChunks: string[] = [];
 
       if (reader) {
         while (true) {
@@ -379,7 +409,7 @@ export default function Home() {
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep the incomplete line in buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             const cleaned = line.trim();
@@ -390,87 +420,28 @@ export default function Home() {
               try {
                 const parsed = JSON.parse(dataStr);
                 const text = parsed.choices?.[0]?.delta?.content || '';
-                
-                // Parse audio data if present in modalities output
-                const deltaAudio = parsed.choices?.[0]?.delta?.audio;
-                let audioTranscript = '';
-                if (deltaAudio) {
-                  if (deltaAudio.transcript) {
-                    audioTranscript = deltaAudio.transcript;
-                  }
-                  if (deltaAudio.data) {
-                    audioDataChunks.push(deltaAudio.data);
-                  }
-                }
-
-                streamContent += (text || audioTranscript);
+                streamContent += text;
 
                 // Update UI state live
                 setMessages(prev => 
                   prev.map(m => m.id === assistantMsg.id ? { ...m, content: streamContent } : m)
                 );
-              } catch (e) {
-                // Ignore chunk parsing error for incomplete json
-              }
+              } catch (e) {}
             }
           }
         }
 
-        // Finalize writing full text/audio content back to IndexedDB
+        // Finalize writing full text content back to IndexedDB
         assistantMsg.content = streamContent || 'No response received.';
-        let fullAudioB64 = audioDataChunks.join('');
-
-        if (requestAudio && !isNativeAudioModel && streamContent) {
-          try {
-            // Strip markdown formatting before speaking
-            const cleanText = streamContent
-              .replace(/\[.*?\]\(.*?\)/g, '')
-              .replace(/[*#`_\-]/g, '')
-              .trim()
-              .slice(0, 1000); // limit text to prevent huge synthesis
-              
-            if (cleanText) {
-              const ttsRes = await fetch('/api/tts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ input: cleanText }),
-              });
-              if (ttsRes.ok) {
-                const blob = await ttsRes.blob();
-                // Convert blob to base64 data url
-                const reader = new FileReader();
-                const base64Promise = new Promise<string>((resolve) => {
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.readAsDataURL(blob);
-                });
-                const audioDataUrl = await base64Promise;
-                assistantMsg.audioUrl = audioDataUrl;
-                
-                // Auto-play the voice response
-                const audio = new Audio(audioDataUrl);
-                audio.play().catch(e => console.error("Auto-play blocked or failed:", e));
-              }
-            }
-          } catch (ttsErr) {
-            console.error("Auto TTS generation failed:", ttsErr);
-          }
-        } else if (fullAudioB64) {
-          assistantMsg.audioUrl = `data:audio/wav;base64,${fullAudioB64}`;
-          // Auto-play native audio response
-          const audio = new Audio(assistantMsg.audioUrl);
-          audio.play().catch(e => console.error("Auto-play blocked or failed:", e));
-        }
-
         await updateMessage(assistantMsg);
 
         // Update State
         setMessages(prev => 
-          prev.map(m => m.id === assistantMsg.id ? { ...m, content: assistantMsg.content, audioUrl: assistantMsg.audioUrl } : m)
+          prev.map(m => m.id === assistantMsg.id ? { ...m, content: assistantMsg.content } : m)
         );
       }
     } catch (err: any) {
       console.error('Error getting chat completion:', err);
-      // Append error message to UI for clear debugging
       setMessages(prev => 
         prev.map(m => {
           if (m.role === 'assistant' && m.content === '') {
@@ -488,7 +459,7 @@ export default function Home() {
   };
 
   const activeSession = sessions.find(s => s.id === activeSessionId) || null;
-  const activeModelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
+  const activeModelName = (models.find(m => m.id === selectedModel)?.name || selectedModel).replace(/^gemini\//i, '');
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">

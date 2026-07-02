@@ -35,14 +35,49 @@ export default function Sidebar({
   const [modelSearch, setModelSearch] = useState('');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
+  // Helper to extract version group name
+  const getModelVersionGroup = (modelId: string, modelName: string): string => {
+    const idLower = modelId.toLowerCase();
+    const nameLower = modelName.toLowerCase();
+    
+    if (idLower.includes('gemini-3.1') || nameLower.includes('gemini 3.1')) return 'Gemini 3.1';
+    if (idLower.includes('gemini-3') || nameLower.includes('gemini 3')) return 'Gemini 3.0';
+    if (idLower.includes('gemini-2.5') || nameLower.includes('gemini 2.5')) return 'Gemini 2.5';
+    if (idLower.includes('gemini-2.0') || nameLower.includes('gemini 2.0')) return 'Gemini 2.0';
+    if (idLower.includes('gemma-4') || nameLower.includes('gemma 4')) return 'Gemma 4';
+    
+    return 'Lainnya';
+  };
+
+  // Filter only chat-compatible Gemini & Gemma models (excl. embedding and image models)
+  const chatModels = models.filter(m => {
+    const id = m.id.toLowerCase();
+    const isEmbedding = id.includes('embed');
+    const isImage = id.includes('image');
+    const isGeminiOrGemma = id.includes('gemini') || id.includes('gemma');
+    return isGeminiOrGemma && !isEmbedding && !isImage;
+  });
+
   // Filter models based on search term
-  const filteredModels = models.filter(m =>
+  const filteredModels = chatModels.filter(m =>
     m.name.toLowerCase().includes(modelSearch.toLowerCase()) ||
     m.id.toLowerCase().includes(modelSearch.toLowerCase())
   );
 
-  const activeModelName = models.find(m => m.id === selectedModel)?.name || 
-    (selectedModel === 'openrouter/free' ? 'Free Models Router' : selectedModel);
+  // Group filteredModels by version group
+  const groupedModels: { [groupName: string]: typeof filteredModels } = {};
+  filteredModels.forEach(m => {
+    const groupName = getModelVersionGroup(m.id, m.name);
+    if (!groupedModels[groupName]) {
+      groupedModels[groupName] = [];
+    }
+    groupedModels[groupName].push(m);
+  });
+
+  // Define display order for groups
+  const groupOrder = ['Gemini 3.1', 'Gemini 3.0', 'Gemini 2.5', 'Gemini 2.0', 'Gemma 4', 'Lainnya'];
+
+  const activeModelName = (models.find(m => m.id === selectedModel)?.name || selectedModel).replace(/^gemini\//i, '');
 
   const handleSelectModel = (modelId: string) => {
     onSelectModel(modelId);
@@ -121,40 +156,54 @@ export default function Sidebar({
                     autoFocus
                   />
                 </div>
-                <ul className="max-h-60 overflow-y-auto divide-y divide-gray-800/40">
+                <div className="max-h-60 overflow-y-auto divide-y divide-gray-800/40">
                   {filteredModels.length > 0 ? (
-                    filteredModels.map((model) => {
-                      const isDisabled = model.id !== 'openrouter/free' && model.id !== 'nex-agi/nex-n2-pro:free';
+                    groupOrder.map(groupName => {
+                      const groupModels = groupedModels[groupName];
+                      if (!groupModels || groupModels.length === 0) return null;
+                      
                       return (
-                        <li key={model.id}>
-                          <button
-                            onClick={() => !isDisabled && handleSelectModel(model.id)}
-                            disabled={isDisabled}
-                            className={`w-full px-3 py-2 text-left text-xs transition duration-150 flex flex-col gap-0.5 ${
-                              model.id === selectedModel 
-                                ? 'bg-indigo-600/10 text-indigo-400 font-semibold' 
-                                : isDisabled 
-                                  ? 'opacity-35 cursor-not-allowed text-gray-650' 
-                                  : 'text-gray-400 hover:bg-indigo-600/20 hover:text-indigo-200'
-                            }`}
-                          >
-                            <div className="flex items-center gap-1.5 justify-between w-full">
-                              <span className="truncate font-medium">{model.name}</span>
-                              {isDisabled && (
-                                <span className="text-[8px] bg-gray-950 px-1 py-0.5 rounded text-gray-500 font-sans border border-border-color/25 uppercase font-semibold">Disabled</span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-gray-600 truncate">{model.id}</span>
-                          </button>
-                        </li>
+                        <div key={groupName} className="py-1">
+                          <div className="px-3 py-1.5 text-[9px] font-bold text-indigo-400/80 tracking-wider uppercase bg-gray-950/40 select-none">
+                            {groupName}
+                          </div>
+                          <ul className="divide-y divide-gray-800/10">
+                            {groupModels.map((model) => {
+                              const isDisabled = model.id.toLowerCase().includes('pro') || model.name.toLowerCase().includes('pro');
+                              return (
+                                <li key={model.id}>
+                                  <button
+                                    onClick={() => !isDisabled && handleSelectModel(model.id)}
+                                    disabled={isDisabled}
+                                    className={`w-full px-3 py-2.5 text-left text-xs transition duration-150 flex flex-col gap-0.5 ${
+                                      model.id === selectedModel 
+                                        ? 'bg-indigo-600/10 text-indigo-400 font-semibold' 
+                                        : isDisabled 
+                                          ? 'opacity-40 cursor-not-allowed text-gray-500' 
+                                          : 'text-gray-400 hover:bg-indigo-600/20 hover:text-indigo-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 justify-between w-full">
+                                      <span className="truncate font-medium">{model.name}</span>
+                                      {isDisabled && (
+                                        <span className="text-[8px] bg-gray-950 px-1 py-0.5 rounded text-gray-500 font-sans border border-border-color/25 uppercase font-semibold">Disabled</span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-650 truncate">{model.id}</span>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
                       );
                     })
                   ) : (
-                    <li className="px-3 py-4 text-center text-xs text-gray-500">
+                    <div className="px-3 py-4 text-center text-xs text-gray-500">
                       No models found
-                    </li>
+                    </div>
                   )}
-                </ul>
+                </div>
               </div>
             )}
           </div>
